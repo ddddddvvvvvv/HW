@@ -1,0 +1,96 @@
+root@hw:/home/denis# docker cp covid-data.csv denis_spark_1:/opt/bitnami/spark/covid-data.csv
+root@hw:/home/denis# docker exec -it denis_spark_1 bash
+I have no name!@c5cc41e6c0f5:/opt/bitnami/spark$ pyspark
+>>> from pyspark.sql import SparkSession
+>>> from pyspark.sql.functions import col, max as max_, lag, when, desc, asc
+>>> from pyspark.sql.window import Window
+>>> spark = SparkSession.builder \
+...     .appName("COVID-19 Data Analysis") \
+...     .getOrCreate()
+>>> df = spark.read.csv("covid-data.csv", header=True, inferSchema=True)
+>>> task1_df = df.filter(col("date") == "2021-03-31") \
+...     .select("iso_code", "location", "total_cases_per_million") \
+...     .withColumn("percent_infected", col("total_cases_per_million") / 10000) \
+...     .orderBy(desc("percent_infected")) \
+...     .limit(15) \
+...     .select("iso_code", "location", "percent_infected")
+>>> task1_df.write.csv("/tmp/output/task1", header=True, mode="overwrite")
+>>> task1_result = spark.read.csv("/tmp/output/task1", header=True)
+>>> print("=== Задание 1: 15 стран с наибольшим процентом переболевших ===")
+=== Задание 1: 15 стран с наибольшим процентом переболевших ===
+>>> task1_result.show(15, truncate=False)
++--------+-------------+------------------+
+|iso_code|location     |percent_infected  |
++--------+-------------+------------------+
+|AND     |Andorra      |15.5439073        |
+|MNE     |Montenegro   |14.523725399999998|
+|CZE     |Czechia      |14.3088484        |
+|SMR     |San Marino   |13.9371796        |
+|SVN     |Slovenia     |10.370805800000001|
+|LUX     |Luxembourg   |9.8473424         |
+|ISR     |Israel       |9.625106          |
+|USA     |United States|9.203011          |
+|SRB     |Serbia       |8.8263286         |
+|BHR     |Bahrain      |8.4888601         |
+|PAN     |Panama       |8.2287391         |
+|PRT     |Portugal     |8.0586997         |
+|EST     |Estonia      |8.0226816         |
+|SWE     |Sweden       |7.9697443         |
+|LTU     |Lithuania    |7.9388647         |
++--------+-------------+------------------+
+>>> task2_df = df.filter((col("date") >= "2021-03-25") & (col("date") <= "2021-03-31")) \
+...     .groupBy("location") \
+...     .agg(max_("new_cases").alias("max_new_cases")) \
+...     .orderBy(desc("max_new_cases")) \
+...     .limit(10) \
+...     .select("location", "max_new_cases")
+task2_df.write.csv("/tmp/output/task2", header=True, mode="overwrite")
+>>> task2_result = spark.read.csv("/tmp/output/task2", header=True)
+>>> print("\n=== Задание 2: Top 10 стран по новым случаям ===")
+
+=== Задание 2: Top 10 стран по новым случаям ===
+>>> task2_result.show(10, truncate=False)
++--------------+-------------+
+|location      |max_new_cases|
++--------------+-------------+
+|World         |683205.0     |
+|Europe        |255985.0     |
+|European Union|216452.0     |
+|Asia          |183350.0     |
+|South America |148476.0     |
+|Brazil        |100158.0     |
+|North America |93350.0      |
+|United States |77321.0      |
+|India         |72330.0      |
+|France        |59054.0      |
++--------------+-------------+
+ task3_df = (df.filter((col("location") == "Russia") &
+...                      (col("date").between("2021-03-25", "2021-03-31")))
+...     .select("date", "new_cases")
+...     .withColumn("prev_day_cases", lag("new_cases").over(Window.orderBy("date")))
+...     .withColumn("delta", col("new_cases") - col("prev_day_cases"))
+... )
+>>> task3_df.write.csv("/tmp/output/task3", header=True, mode="overwrite")
+25/08/04 11:10:42 WARN WindowExec: No Partition Defined for Window operation! Moving all data to a single partition, this can cause serious performance degradation.
+25/08/04 11:10:42 WARN WindowExec: No Partition Defined for Window operation! Moving all data to a single partition, this can cause serious performance degradation.
+25/08/04 11:10:42 WARN WindowExec: No Partition Defined for Window operation! Moving all data to a single partition, this can cause serious performance degradation.
+>>> spark.sparkContext.setLogLevel("ERROR")
+>>> task3_df.write.csv("/tmp/output/task3", header=True, mode="overwrite")
+>>> task3_result = spark.read.csv("/tmp/output/task3", header=True)
+>>> print("\n=== Задание 3: Изменение случаев в России ===")
+
+=== Задание 3: Изменение случаев в России ===
+>>> task3_result.show(7, truncate=False)  # 7 дней последней недели марта
++----------+---------+--------------+------+
+|date      |new_cases|prev_day_cases|delta |
++----------+---------+--------------+------+
+|2021-03-25|9128.0   |null          |null  |
+|2021-03-26|9073.0   |9128.0        |-55.0 |
+|2021-03-27|8783.0   |9073.0        |-290.0|
+|2021-03-28|8979.0   |8783.0        |196.0 |
+|2021-03-29|8589.0   |8979.0        |-390.0|
+|2021-03-30|8162.0   |8589.0        |-427.0|
+|2021-03-31|8156.0   |8162.0        |-6.0  |
++----------+---------+--------------+------+
+
+>>>
