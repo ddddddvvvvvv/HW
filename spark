@@ -38,38 +38,41 @@ I have no name!@c5cc41e6c0f5:/opt/bitnami/spark$ pyspark
 |SWE     |Sweden       |7.9697443         |
 |LTU     |Lithuania    |7.9388647         |
 +--------+-------------+------------------+
->>> task2_df = df.filter((col("date") >= "2021-03-25") & (col("date") <= "2021-03-31")) \
-...     .groupBy("location") \
-...     .agg(max_("new_cases").alias("max_new_cases")) \
-...     .orderBy(desc("max_new_cases")) \
-...     .limit(10) \
+>>> non_countries = ["World", "Europe", "European Union", "International",
+...                 "North America", "South America", "Asia", "Africa",
+...                 "Oceania", "High income", "Low income", "Lower middle income",
+...                 "Upper middle income"]
+>>> task2_df = (df.filter((col("date").between("2021-03-25", "2021-03-31")) &
+...              ~col("location").isin(non_countries))
+)...     .groupBy("location")
+...     .agg(max_("new_cases").alias("max_new_cases"))
+...     .orderBy(desc("max_new_cases"))
+...     .limit(10)
 ...     .select("location", "max_new_cases")
-task2_df.write.csv("/tmp/output/task2", header=True, mode="overwrite")
->>> task2_result = spark.read.csv("/tmp/output/task2", header=True)
->>> print("\n=== Задание 2: Top 10 стран по новым случаям ===")
+... )
+>>> task2_df.write.csv("/tmp/output/task2_filtered", header=True, mode="overwrite")
 
-=== Задание 2: Top 10 стран по новым случаям ===
->>> task2_result.show(10, truncate=False)
-+--------------+-------------+
-|location      |max_new_cases|
-+--------------+-------------+
-|World         |683205.0     |
-|Europe        |255985.0     |
-|European Union|216452.0     |
-|Asia          |183350.0     |
-|South America |148476.0     |
-|Brazil        |100158.0     |
-|North America |93350.0      |
-|United States |77321.0      |
-|India         |72330.0      |
-|France        |59054.0      |
-+--------------+-------------+
  task3_df = (df.filter((col("location") == "Russia") &
 ...                      (col("date").between("2021-03-25", "2021-03-31")))
 ...     .select("date", "new_cases")
 ...     .withColumn("prev_day_cases", lag("new_cases").over(Window.orderBy("date")))
 ...     .withColumn("delta", col("new_cases") - col("prev_day_cases"))
 ... )
+>>> task2_result.show(10, truncate=False)
++-------------+-------------+
+|location     |max_new_cases|
++-------------+-------------+
+|Brazil       |100158.0     |
+|United States|77321.0      |
+|India        |72330.0      |
+|France       |59054.0      |
+|Turkey       |39302.0      |
+|Poland       |35145.0      |
+|Germany      |25014.0      |
+|Italy        |24076.0      |
+|Peru         |19206.0      |
+|Ukraine      |18226.0      |
++-------------+-------------+
 >>> task3_df.write.csv("/tmp/output/task3", header=True, mode="overwrite")
 25/08/04 11:10:42 WARN WindowExec: No Partition Defined for Window operation! Moving all data to a single partition, this can cause serious performance degradation.
 25/08/04 11:10:42 WARN WindowExec: No Partition Defined for Window operation! Moving all data to a single partition, this can cause serious performance degradation.
